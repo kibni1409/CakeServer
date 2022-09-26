@@ -1,22 +1,27 @@
 const express = require('express');
-const jsonBodyMW = express.json();
+const couchdb = require('felix-couchdb');
 const cors = require('cors');
 
 
+//Настройки APP
 const app = express();
-const port = 3003;
-app.use(jsonBodyMW)
+const jsonBodyMW = express.json();
+app.use(jsonBodyMW);
 app.use(cors());
 
-let dbHost = "127.0.0.1";
-let dbPort = 5984;
-let dbName = "cakedb";
-let couchdb = require('felix-couchdb');
-let client = couchdb.createClient(dbPort, dbHost, 'admin', 'admin');
-let db = client.db(dbName);
 
+//Объявление ключевый переменных
+const dbHost = "127.0.0.1";
+const port = 3003;
+const dbPort = 5984;
+const dbOrders = "cakedb";
+const dbUsers = "usersdb";
+const client = couchdb.createClient(dbPort, dbHost, 'admin', 'admin');
+
+//Роутинг запросов
 //Получение всех записей разом
 app.get('/all', (req, res) => {
+    let db = client.db(dbOrders);
     db.view('age', 'new-view', function (err, doc) {
         res.send(doc);
     })
@@ -39,6 +44,7 @@ app.get('/alle', (req, res) => {
 
 //Добавление записи
 app.post('/save', (req, res) => {
+    let db = client.db(dbOrders);
     if (!req.body.name) {
         res.send('Name dont send')
     } else if (!req.body.age) {
@@ -53,7 +59,41 @@ app.post('/save', (req, res) => {
     }
 })
 
+//Регистрация пользователя
+app.post('/register', (req, res) => {
+    let db = client.db(dbUsers);
+    if (!req.body.login) {
+        res.send('Name dont login')
+    } else if (!req.body.password) {
+        res.send('Age dont password')
+    } else {
+        let doc = {
+            login: req.body.login,
+            password: req.body.password
+        }
+        db.saveDoc(doc);
+        res.send(200)
+    }
+})
 
+//Авторизация пользователя
+app.get('/login', (req, res) => {
+    let login = req.query.login;
+    client.request('get', `http://127.0.0.1:5984/usersdb/_design/users/_view/login?key="${login}"`, null, function (err, doc) {
+        let result = JSON.stringify(doc);
+        if(doc.rows.length > 0){
+            res.send(doc);
+        }
+        else{
+            res.send('Not found');
+        }
+    })
+})
+
+
+
+
+//Запуск сервера
 app.listen(port, () => {
     console.log(`started on port ${port}`)
 })
